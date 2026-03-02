@@ -170,17 +170,8 @@ jobs:
             autoUpdater.autoDownload = false;
             const readToken = "__GH_READ_TOKEN__";
             if (readToken) {
-              // Injeta o token em todas as requisicoes para github.com
-              const { session } = require("electron");
-              session.defaultSession.webRequest.onBeforeSendHeaders(
-                { urls: ["https://github.com/*", "https://api.github.com/*", "https://objects.githubusercontent.com/*"] },
-                (details, callback) => {
-                  details.requestHeaders["Authorization"] = `token ${readToken}`;
-                  callback({ requestHeaders: details.requestHeaders });
-                }
-              );
-              // Tambem configura no autoUpdater diretamente
               autoUpdater.addAuthHeader(`token ${readToken}`);
+              autoUpdater.requestHeaders = { Authorization: `token ${readToken}` };
             }
             autoUpdater.on("update-available", info => {
               dialog.showMessageBox(win, {
