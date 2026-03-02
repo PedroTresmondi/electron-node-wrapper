@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────
+# Preenchido automaticamente pelo workflow build-exe.yml
+# com os valores do repositório do jogo.
+# ─────────────────────────────────────────────────────────────
+
+appId: com.yourname.myapp
+productName: MyApp
+copyright: Copyright © 2026 YOUR_NAME
+
+electronUpdaterCompatibility: ">= 2.16"
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - electron/**/*
+  - app/**/*
+  - package.json
+
+# O server.js usa módulos ES (type: module) e dependências Node.
+# O asar embute tudo — Node.js nativo do Electron executa o server.js.
+asar: true
+
+# node_modules do jogo precisam ir junto (express, multer etc.)
+# O electron-builder inclui apenas os "dependencies" (não devDependencies).
+# Por isso o workflow copia o package.json do jogo e roda npm install --omit=dev.
+extraResources:
+  - from: app/node_modules
+    to: app/node_modules
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.games
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Game
+
+publish:
+  - provider: github
+    owner: OWNER_PLACEHOLDER
+    repo: REPO_PLACEHOLDER
+    releaseType: release
