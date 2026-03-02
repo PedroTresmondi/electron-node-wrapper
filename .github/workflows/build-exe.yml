@@ -239,15 +239,13 @@ jobs:
           REPO_NAME: ${{ github.event.repository.name }}
           APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
         run: |
-          $appId     = "com.$($env:REPO_OWNER.ToLower() -replace '[^a-z0-9]','').$($env:REPO_NAME.ToLower() -replace '[^a-z0-9]','')"
-          $hasIcon   = Test-Path "_build\icon.png"
-          $iconLine  = if ($hasIcon) { "icon: icon.png" } else { "" }
-          $winIcon   = if ($hasIcon) { "    icon: icon.png" } else { "" }
-          @"
+          $appId   = "com.$($env:REPO_OWNER.ToLower() -replace '[^a-z0-9]','').$($env:REPO_NAME.ToLower() -replace '[^a-z0-9]','')"
+          $hasIcon = Test-Path "_build\icon.png"
+
+          $yml = @"
           appId: $appId
           productName: $($env:REPO_NAME)
           electronUpdaterCompatibility: ">= 2.16"
-          $iconLine
           directories:
             output: release
           files:
@@ -256,7 +254,6 @@ jobs:
             - "!*.yml"
           asar: false
           win:
-            $winIcon
             target:
               - target: nsis
                 arch: [x64]
@@ -271,7 +268,16 @@ jobs:
               owner: $($env:REPO_OWNER)
               repo: $($env:REPO_NAME)
               releaseType: release
-          "@ | Set-Content "_build\electron-builder.yml"
+          "@
+
+          if ($hasIcon) {
+            $yml = "icon: icon.png`n" + $yml
+            $yml = $yml -replace '(win:\n)', "win:`n  icon: icon.png`n"
+          }
+
+          $yml | Set-Content "_build\electron-builder.yml"
+          Write-Host "=== electron-builder.yml ==="
+          Get-Content "_build\electron-builder.yml"
 
       - name: Write package.json
         shell: pwsh
