@@ -101,7 +101,6 @@ jobs:
           import { fileURLToPath } from "url";
 
           const require = createRequire(import.meta.url);
-          const { autoUpdater } = require("electron-updater");
           const log = require("electron-log");
 
           const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -110,7 +109,6 @@ jobs:
           if (!gotLock) { app.quit(); }
 
           log.transports.file.level = "info";
-          autoUpdater.logger = log;
 
           const appRoot      = __dirname;
           const userDataPath = app.getPath("userData");
@@ -166,38 +164,54 @@ jobs:
             });
           }
 
+          function checkForUpdatesManually(owner, repo, currentVersion, token) {
+            const { net } = require("electron");
+            const headers = { "User-Agent": "electron-app", "Accept": "application/vnd.github+json" };
+            if (token) headers["Authorization"] = `token ${token}`;
+            const request = net.request({ url: `https://api.github.com/repos/${owner}/${repo}/releases/latest`, headers });
+            let body = "";
+            request.on("response", (response) => {
+              response.on("data", (chunk) => { body += chunk.toString(); });
+              response.on("end", () => {
+                try {
+                  const release = JSON.parse(body);
+                  const latestVersion = release.tag_name ? release.tag_name.replace(/^v/, "") : null;
+                  if (!latestVersion) { log.info("Nenhuma release encontrada"); return; }
+                  log.info(`Versao atual: ${currentVersion}, ultima release: ${latestVersion}`);
+                  const current = currentVersion.split(".").map(Number);
+                  const latest = latestVersion.split(".").map(Number);
+                  let isNewer = false;
+                  for (let i = 0; i < 3; i++) {
+                    if ((latest[i] || 0) > (current[i] || 0)) { isNewer = true; break; }
+                    if ((latest[i] || 0) < (current[i] || 0)) break;
+                  }
+                  if (!isNewer) { log.info("App ja esta na versao mais recente"); return; }
+                  const asset = release.assets && release.assets.find(a => a.name.endsWith(".exe"));
+                  if (!asset) { log.info("Nenhum .exe encontrado na release"); return; }
+                  dialog.showMessageBox(win, {
+                    type: "info", title: "Atualizacao disponivel",
+                    message: `Versao ${latestVersion} disponivel!`,
+                    detail: "Deseja baixar e instalar agora?",
+                    buttons: ["Baixar", "Depois"], defaultId: 0, cancelId: 1,
+                  }).then(({ response }) => {
+                    if (response === 0) {
+                      const { shell } = require("electron");
+                      shell.openExternal(asset.browser_download_url);
+                    }
+                  });
+                } catch (e) { log.error("Erro ao verificar atualizacao:", e.message); }
+              });
+            });
+            request.on("error", (err) => { log.error("Erro na requisicao de update:", err.message); });
+            request.end();
+          }
+
           function setupAutoUpdater() {
-            autoUpdater.autoDownload = false;
             const readToken = "__GH_READ_TOKEN__";
-            if (readToken) {
-              autoUpdater.addAuthHeader(`token ${readToken}`);
-              autoUpdater.requestHeaders = { Authorization: `token ${readToken}` };
-            }
-            autoUpdater.on("update-available", info => {
-              dialog.showMessageBox(win, {
-                type: "info", title: "Atualizacao disponivel",
-                message: "Versao " + info.version + " disponivel.",
-                detail: "Deseja baixar agora?",
-                buttons: ["Baixar", "Depois"], defaultId: 0, cancelId: 1,
-              }).then(({ response }) => { if (response === 0) autoUpdater.downloadUpdate(); });
-            });
-            autoUpdater.on("download-progress", p => {
-              if (win && !win.isDestroyed()) {
-                win.setTitle("Baixando... " + Math.round(p.percent) + "%");
-                win.setProgressBar(p.percent / 100);
-              }
-            });
-            autoUpdater.on("update-downloaded", info => {
-              if (win && !win.isDestroyed()) { win.setTitle(app.name); win.setProgressBar(-1); }
-              dialog.showMessageBox(win, {
-                type: "question", title: "Atualizacao pronta",
-                message: "Versao " + info.version + " pronta.",
-                detail: "Reiniciar agora?",
-                buttons: ["Reiniciar", "Depois"], defaultId: 0, cancelId: 1,
-              }).then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall(false, true); });
-            });
-            autoUpdater.on("error", err => log.error("updater error:", err.message));
-            setTimeout(() => autoUpdater.checkForUpdates(), 3000);
+            const owner = "__REPO_OWNER__";
+            const repo = "__REPO_NAME__";
+            const currentVersion = app.getVersion();
+            setTimeout(() => checkForUpdatesManually(owner, repo, currentVersion, readToken), 3000);
           }
 
           app.whenReady().then(async () => {
@@ -227,10 +241,17 @@ jobs:
         shell: pwsh
         env:
           GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           $token = if ($env:GH_READ_TOKEN) { $env:GH_READ_TOKEN } else { "" }
-          (Get-Content "_build\main.js" -Raw) -replace '__GH_READ_TOKEN__', $token | Set-Content "_build\main.js"
+          $content = Get-Content "_build\main.js" -Raw
+          $content = $content -replace '__GH_READ_TOKEN__', $token
+          $content = $content -replace '__REPO_OWNER__', $env:REPO_OWNER
+          $content = $content -replace '__REPO_NAME__', $env:REPO_NAME
+          $content | Set-Content "_build\main.js"
           Write-Host "Token injetado: $($token.Length -gt 0 ? 'sim' : 'nao (repo publico)')"
+          Write-Host "Owner: $($env:REPO_OWNER), Repo: $($env:REPO_NAME)"
 
       - name: Write electron-builder.yml
         shell: pwsh
@@ -308,9 +329,8 @@ jobs:
         run: |
           npm install
           npm install --save-dev electron electron-builder
-          npm install electron-updater electron-log
-          Write-Host "electron-updater: $(Test-Path 'node_modules\electron-updater')"
-          Write-Host "electron-log:     $(Test-Path 'node_modules\electron-log')"
+          npm install electron-log
+          Write-Host "electron-log: $(Test-Path 'node_modules\electron-log')"
 
       - name: Build Windows installer
         working-directory: _build
