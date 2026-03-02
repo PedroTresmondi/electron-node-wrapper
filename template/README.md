@@ -1,62 +1,25 @@
-# Como usar este template
+# Template para novos projetos
 
-## Estrutura esperada do projeto
+Use este conteúdo no seu repositório para gerar um .exe com o **electron-node-wrapper**.
+
+## README completo
+
+A documentação do fluxo (como aplicar em novos projetos, requisitos do `server.js`, secrets, release e auto-update) está no **README da raiz** do repositório:
+
+**https://github.com/PedroTresmondi/electron-node-wrapper#readme**
+
+## Arquivo a copiar
+
+Copie o arquivo **`build-exe.yml`** desta pasta para o seu projeto em:
 
 ```
-meu-projeto/
-├── .github/
-│   └── workflows/
-│       └── build-exe.yml     ← copiar de workflow/build-exe.yml
-├── dist/                     ← gerado pelo build (vite, webpack, etc.)
-├── public/                   ← (opcional) assets publicos
-├── src/
-│   └── assets/               ← (opcional) assets do src
-├── data/                     ← (opcional) dados iniciais (config.json, etc.)
-├── icon.png                  ← (opcional) icone do app, minimo 256x256
-├── server.js                 ← OBRIGATORIO — servidor Express
-└── package.json              ← OBRIGATORIO — deve ter "scripts.build"
+.github/workflows/build-exe.yml
 ```
 
-## Requisitos do projeto
+O conteúdo é sempre o mesmo; não é necessário alterar nada. Em seguida:
 
-### package.json
-Deve ter um script `build` que gera a pasta `dist/`:
-```json
-{
-  "type": "module",
-  "scripts": {
-    "build": "vite build"
-  },
-  "dependencies": {
-    "express": "^4.x"
-  }
-}
-```
+1. Configure a secret **GH_READ_TOKEN** no seu repo (Settings → Secrets).
+2. Ative **Read and write permissions** em Settings → Actions.
+3. Garanta que o projeto tem `package.json` (com `version` e script `build`) e `server.js` usando `process.env.PORT`, `process.env.DATA_DIR` e `process.env.DIST_PATH`.
 
-### server.js
-- Usar Express
-- Escutar em `process.env.PORT` (fallback `3000`)
-- Servir `process.env.DIST_PATH` como static (fallback `./dist`)
-- Usar `process.env.DATA_DIR` para dados persistentes
-
-Use o `template/server.js` como ponto de partida.
-
-## Como gerar o .exe
-
-### Manualmente (sem publicar release)
-1. Va em **Actions → Build Executable → Run workflow**
-2. Deixe `publish` como `false`
-3. Baixe o `.exe` em **Artifacts**
-
-### Publicando uma release com auto-update
-1. Atualize a versao em `package.json`
-2. Crie uma tag e faca push:
-   ```
-   git tag v1.1.0
-   git push origin v1.1.0
-   ```
-3. O workflow roda automaticamente e publica a release no GitHub
-
-## Configuracao necessaria no GitHub
-
-Settings → Actions → General → Workflow permissions → **Read and write permissions**
+Detalhes e exemplos de código estão no README principal do **electron-node-wrapper**.
