@@ -18,6 +18,26 @@ Qualquer repositório que tenha um backend Express (`server.js`) e um frontend (
 
 ## Aplicar em um novo projeto
 
+### Repo que já existe: baixar o workflow sem copiar manualmente
+
+No diretório do repositório existente, rode **um** dos comandos abaixo. Ele cria `.github/workflows/` e baixa o `build-exe.yml` deste repositório.
+
+**PowerShell (Windows):**
+```powershell
+New-Item -ItemType Directory -Force -Path ".github\workflows" | Out-Null
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PedroTresmondi/electron-node-wrapper/main/template/build-exe.yml" -OutFile ".github\workflows\build-exe.yml"
+```
+
+**Bash / Git Bash / Linux / macOS:**
+```bash
+mkdir -p .github/workflows
+curl -o .github/workflows/build-exe.yml https://raw.githubusercontent.com/PedroTresmondi/electron-node-wrapper/main/template/build-exe.yml
+```
+
+Depois: `git add .github/workflows/build-exe.yml`, commit, push e configure no GitHub a secret **GH_READ_TOKEN** e **Read and write permissions** (ver seção 5 abaixo).
+
+---
+
 ### 1. Estrutura mínima do projeto
 
 O repositório deve ter algo como:
@@ -202,8 +222,8 @@ Para funcionar em mais projetos sem mudar o YAML em cada um:
 
 ## Resumo rápido para novo projeto
 
-1. Copiar o conteúdo do **build-exe.yml** acima para `.github/workflows/build-exe.yml` no novo repo.
-2. Garantir **package.json** com `version`, `build` e dependências; **server.js** usando `PORT`, `DATA_DIR` e `DIST_PATH`.
+1. **Workflow no repo**: use um dos comandos da seção [Repo que já existe](#repo-que-já-existe-baixar-o-workflow-sem-copiar-manualmente) (PowerShell ou curl) **ou** crie manualmente `.github/workflows/build-exe.yml` com o conteúdo indicado.
+2. Garantir **package.json** com `version`, `build` (ou usar `public/`) e dependências; **server.js** usando `PORT`, `DATA_DIR` e `DIST_PATH`.
 3. No GitHub do **projeto**: criar secret **GH_READ_TOKEN** e marcar **Read and write permissions** em Actions.
 4. Rodar o workflow (manual com `publish: true` ou push da tag `v*.*.*`) e baixar o instalador da release ou dos Artifacts.
 
