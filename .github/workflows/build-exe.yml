@@ -30,10 +30,21 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        shell: pwsh
+        run: |
+          if (Test-Path "package-lock.json") { npm ci } else { npm install }
+          Write-Host "Dependencies installed"
 
-      - name: Build project
-        run: npm run build
+      - name: Build project (if script exists)
+        shell: pwsh
+        run: |
+          $pkg = Get-Content "package.json" -Raw | ConvertFrom-Json
+          if ($pkg.scripts -and $pkg.scripts.build) {
+            npm run build
+            Write-Host "Build completed"
+          } else {
+            Write-Host "No build script — skipping build step"
+          }
 
       - name: Create _build folder
         shell: pwsh
@@ -42,16 +53,20 @@ jobs:
       - name: Copy project files to _build
         shell: pwsh
         run: |
-          # dist/ — obrigatorio
+          # dist/ ou public/ — pelo menos um para arquivos estaticos
           if (Test-Path "dist") {
             Copy-Item -Recurse -Force "dist" "_build\dist"
             Write-Host "dist/ copiado"
+          } elseif (Test-Path "public") {
+            New-Item -ItemType Directory -Force -Path "_build\dist" | Out-Null
+            Copy-Item -Recurse -Force "public\*" "_build\dist"
+            Write-Host "public/ copiado como dist/"
           } else {
-            Write-Error "ERRO: pasta dist/ nao encontrada. Verifique o script de build."
+            Write-Error "ERRO: Nenhuma pasta dist/ nem public/ encontrada. Adicione um script 'build' no package.json (que gera dist/) ou coloque os arquivos estaticos em public/."
             exit 1
           }
 
-          # public/ — opcional
+          # public/ (complementar, se existir junto com dist)
           if (Test-Path "public") {
             Copy-Item -Recurse -Force "public" "_build\public"
             Write-Host "public/ copiado"
@@ -59,7 +74,7 @@ jobs:
 
           # src/assets/ — opcional
           if (Test-Path "src\assets") {
-            New-Item -ItemType Directory -Force -Path "_build\src"
+            New-Item -ItemType Directory -Force -Path "_build\src" | Out-Null
             Copy-Item -Recurse -Force "src\assets" "_build\src\assets"
             Write-Host "src/assets/ copiado"
           }
@@ -89,6 +104,19 @@ jobs:
           } else {
             Write-Host "Nenhum icone encontrado, usando padrao do Electron"
           }
+
+      - name: Set APP_VERSION
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+            $ver = if ($tag -match '^v') { $tag.Substring(1) } else { $tag }
+          } else {
+            $pkg = Get-Content "package.json" -Raw | ConvertFrom-Json
+            $ver = if ($pkg.version) { $pkg.version } else { "1.0.0" }
+          }
+          "APP_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "APP_VERSION=$ver"
 
       - name: Write main.js
         shell: pwsh
@@ -258,7 +286,6 @@ jobs:
         env:
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
-          APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
         run: |
           $appId   = "com.$($env:REPO_OWNER.ToLower() -replace '[^a-z0-9]','').$($env:REPO_NAME.ToLower() -replace '[^a-z0-9]','')"
           $hasIcon = Test-Path "_build\icon.png"
@@ -305,7 +332,6 @@ jobs:
         env:
           REPO_NAME: ${{ github.event.repository.name }}
           REPO_OWNER: ${{ github.repository_owner }}
-          APP_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
         run: |
           $version = $env:APP_VERSION -replace '^v',''
           $name    = $env:REPO_NAME.ToLower() -replace '[^a-z0-9\-]','-'

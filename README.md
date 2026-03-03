@@ -70,12 +70,12 @@ Nada mais é necessário no YAML — toda a lógica de build está no repositór
 
 ### 3. Requisitos do `package.json`
 
-- **`version`**: usado como versão do app e da release (ex.: `"1.0.0"`).
+- **`version`**: usado como versão do app e da release (ex.: `"1.0.0"`). Quando você roda o workflow sem tag, a versão é lida daqui.
 - **`type`: `"module"`** se o `server.js` usar `import` (ESM).
-- **Script `build`**: comando que gera a pasta `dist/` (ex.: `"build": "vite build"`).
+- **Script `build`** (opcional): se existir, o workflow roda `npm run build` antes de copiar os arquivos. O build deve gerar a pasta `dist/`. Se não houver script `build`, o workflow não roda build e espera que você tenha a pasta **`public/`** com os arquivos estáticos (que será usada no lugar de `dist/`).
 - **`dependencies`**: incluir o que o `server.js` usa (ex.: `express`, `multer`, `cors`).
 
-Exemplo mínimo:
+Exemplo mínimo **com** build (Vite, etc.):
 
 ```json
 {
@@ -91,6 +91,24 @@ Exemplo mínimo:
   }
 }
 ```
+
+Exemplo **sem** build (só arquivos estáticos em `public/`):
+
+```json
+{
+  "name": "meu-app",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
+```
+
+Nesse caso, coloque `index.html`, CSS e JS dentro da pasta **`public/`** na raiz do projeto.
 
 ### 4. Requisitos do `server.js`
 
@@ -168,6 +186,17 @@ Para isso funcionar em repositório privado:
 
 - O token (**GH_READ_TOKEN**) deve ter permissão de leitura no repositório (ou na organização).
 - A secret **GH_READ_TOKEN** deve estar configurada no repositório que **chama** o workflow (o seu app), pois o workflow central injeta esse valor no `main.js` do Electron.
+
+---
+
+## Comportamento universal do workflow
+
+Para funcionar em mais projetos sem mudar o YAML em cada um:
+
+- **Instalação**: usa `npm ci` se existir `package-lock.json`, senão `npm install`.
+- **Build**: roda `npm run build` **só se** o `package.json` tiver o script `build`. Caso contrário, pula o build.
+- **Arquivos estáticos**: exige **`dist/`** (gerada pelo build) **ou** **`public/`**. Se não houver `dist/`, o conteúdo de `public/` é usado como raiz do frontend (equivalente a `dist/`).
+- **Versão**: em execução por **tag** (`v1.2.3`), a versão do app e da release é a da tag. Sem tag (run manual), a versão é lida do campo **`version`** do `package.json` do projeto.
 
 ---
 
